@@ -3,10 +3,16 @@ package db
 import (
 	"chat-system/types"
 	"context"
+	"crypto/sha256"
 	"database/sql"
+	"encoding/hex"
 	"fmt"
 	"log"
+	"math"
+	"math/rand"
 	"time"
+
+	_ "github.com/go-sql-driver/mysql"
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
@@ -65,14 +71,14 @@ func NewRedisStorage(endpoint string) *RedisStorage {
 func NewMySQLClient(endpoint string) (*MySQLClient, error) {
 	// takes some table as input to dictate methods
 	db, err := sql.Open("mysql", endpoint)
-	db.SetConnMaxLifetime(time.Minute * 3)
-	db.SetMaxOpenConns(10)
-	db.SetMaxIdleConns(10)
-	defer db.Close()
 
 	if err != nil {
 		return nil, err
 	}
+
+	db.SetConnMaxLifetime(time.Minute * 3)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
 	msc := &MySQLClient{
 		DB: db,
 	}
@@ -82,21 +88,26 @@ func NewMySQLClient(endpoint string) (*MySQLClient, error) {
 	}
 
 	msc.ApplicationStorage = &as
+	logrus.Info("MySQL client initialized")
 
 	return msc, nil
 }
 
 func (as *ApplicationStorage) Write(record map[string]string) error {
 	var exists bool
-	row := as.client.DB.QueryRow("SELECT EXISTS(SELECT * FROM applications WHERE name=?", record["name"])
+	row := as.client.DB.QueryRow("SELECT EXISTS(SELECT * FROM applications WHERE name=?);", record["name"]) // sql injection ?
 	if err := row.Scan(&exists); err != nil {
+		fmt.Println(err.Error())
 		return err
 	} else if !exists {
-		// generate token
-		if _, err := as.client.DB.Exec("INSERT INTO applications (`name`, `token`, `chat_count`) VALUES (?, ?, 0)"); err != nil {
+		token := generateToken()
+
+		if _, err := as.client.DB.Exec("INSERT INTO applications (`name`, `token`, `chat_count`) VALUES (?, ?, 0)", record["name"], token); err != nil {
 			return err
 		}
+		logrus.Info("Wrote application into db")
 	} else if exists {
+		logrus.Error("Application already exists")
 		return fmt.Errorf("Application already exists")
 	}
 	return nil
@@ -136,4 +147,18 @@ func (as *ApplicationStorage) ReadAll() ([]any, error) {
 
 type ApplicationStorage struct {
 	client *MySQLClient
+}
+
+func generateToken() string {
+	rand.Seed(time.Now().UnixNano())
+	randomNum := rand.Intn(math.MaxInt)
+	randomNumStr := fmt.Sprintf("%d", randomNum)
+
+	sha256Hash := sha256.New()
+	sha256Hash.Write([]byte(randomNumStr))
+	hashBytes := sha256Hash.Sum(nil)
+
+	hashHex := hex.EncodeToString(hashBytes)
+	randomString := hashHex[:8]
+	return randomString
 }

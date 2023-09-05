@@ -1,8 +1,9 @@
-package api
+package main
 
 import (
 	"chat-system/db"
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/gorilla/mux"
@@ -10,6 +11,7 @@ import (
 )
 
 var msc *db.MySQLClient
+var err error
 
 func GetApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -59,21 +61,24 @@ func CreateApplication(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-
-	msc, _ = db.NewMySQLClient("localhost:3306")
+	msc, err = db.NewMySQLClient("admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb")
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	router := mux.NewRouter()
 
 	// specify endpoints, handler functions and HTTP method
 	router.HandleFunc("/applications", GetApplications).Methods("GET")
-	router.HandleFunc("/applications/{name}", CreateApplication).Methods("POST")
+	router.HandleFunc("/applications", CreateApplication).Methods("POST")
 	router.HandleFunc("/applications/{name}", GetApplication).Methods("GET")
 
-	router.HandleFunc("/applications/{name}/chats", GetChats).Methods("GET")
-	router.HandleFunc("/applications/{name}/chats/{id}", GetChat).Methods("GET")
-	router.HandleFunc("/applications/{name}/chats/{id}", CreateChat).Methods("POST")
+	// router.HandleFunc("/applications/{name}/chats", GetChats).Methods("GET")
+	// router.HandleFunc("/applications/{name}/chats/{id}", GetChat).Methods("GET")
+	// router.HandleFunc("/applications/{name}/chats/{id}", CreateChat).Methods("POST")
 
 	http.Handle("/", router)
+	logrus.Info("Api server initialized")
 
 	// start and listen to requests
 	http.ListenAndServe(":8080", router)
