@@ -69,7 +69,6 @@ func NewRedisStorage(endpoint string) *RedisStorage {
 }
 
 func NewMySQLClient(endpoint string) (*MySQLClient, error) {
-	// takes some table as input to dictate methods
 	db, err := sql.Open("mysql", endpoint)
 
 	if err != nil {

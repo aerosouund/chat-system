@@ -2,9 +2,13 @@ package main
 
 import (
 	"chat-system/db"
+	"chat-system/queue"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
+	"sync/atomic"
 
 	"github.com/gorilla/mux"
 	"github.com/sirupsen/logrus"
@@ -12,6 +16,13 @@ import (
 
 var msc *db.MySQLClient
 var err error
+var mq queue.MessageQueueWriter
+
+var NextChatID atomic.Uint64
+
+func GetNextChatID() uint64 {
+	return NextChatID.Add(1)
+}
 
 func GetApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
@@ -60,8 +71,52 @@ func CreateApplication(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func CreateChat(w http.ResponseWriter, r *http.Request) {
+	// the chat number which should be constantly incremented
+	vars := mux.Vars(r)
+	token := vars["token"]
+	chatNumber := strconv.Itoa(int(GetNextChatID()))
+
+	// get chat number
+
+	createChatMessage := map[string]string{
+		"applicationToken": token,
+		"chatNumber":       chatNumber,
+	}
+
+	jsonString, err := json.Marshal(createChatMessage)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	err = mq.Write("chats", string(jsonString))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	response := map[string]string{
+		"chatNumber": chatNumber,
+	}
+	jsonResponse, err := json.Marshal(response)
+	if err != nil {
+		fmt.Println("Error:", err)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprintf(w, string(jsonResponse))
+
+	// write message in the queue
+}
+
 func main() {
 	msc, err = db.NewMySQLClient("admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	mq, err = queue.NewRabbitMQWriter("localhost:5679")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -73,7 +128,7 @@ func main() {
 	router.HandleFunc("/applications", CreateApplication).Methods("POST")
 	router.HandleFunc("/applications/{name}", GetApplication).Methods("GET")
 
-	// router.HandleFunc("/applications/{name}/chats", GetChats).Methods("GET")
+	router.HandleFunc("/applications/{name}/chats", CreateChat).Methods("POST")
 	// router.HandleFunc("/applications/{name}/chats/{id}", GetChat).Methods("GET")
 	// router.HandleFunc("/applications/{name}/chats/{id}", CreateChat).Methods("POST")
 
