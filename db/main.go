@@ -21,8 +21,7 @@ import (
 type ApplicationStorer interface {
 	CreateApplication()
 	GetApplication()
-	UpdateApplication()
-	DeleteApplication()
+	GetAll()
 }
 
 type ChatStorer interface {
@@ -91,6 +90,22 @@ func (asc *ApplicationSQLStorage) GetApplication(appname string) (*types.Applica
 		return nil, fmt.Errorf("Application not found")
 	}
 	return &app, nil
+}
+
+func (asc *ApplicationSQLStorage) GetAll() ([]any, error) {
+	var apps []any
+	res, err := asc.DB.Query("SELECT * FROM applications")
+
+	if err != nil {
+		logrus.Error("Unable to read applications,", err)
+	}
+
+	for res.Next() {
+		var app types.Application
+		res.Scan(&app.Name, &app.Token, &app.ChatCount)
+		apps = append(apps, app)
+	}
+	return apps, nil
 }
 
 //---------------------------------------------------//
@@ -165,12 +180,7 @@ func NewMySQLClient(endpoint string) (*MySQLClient, error) {
 		client: msc,
 	}
 
-	cs := ChatStorage{
-		client: msc,
-	}
-
 	msc.ApplicationStorage = &as
-	msc.ChatStorage = &cs
 	logrus.Info("MySQL client initialized")
 
 	return msc, nil
@@ -250,25 +260,6 @@ func (cs *ChatStorage) Write(record map[string]string) error {
 		return fmt.Errorf("Chat already exists")
 	}
 	return nil
-}
-
-func (cs *ChatStorage) Read(record map[string]string) (any, error) {
-	var app types.Application
-	res, err := as.client.DB.Query("SELECT * FROM applications WHERE name=?", token)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	for res.Next() {
-		err = res.Scan(&app.Name, &app.Token, &app.ChatCount)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if app == (types.Application{}) {
-		return nil, fmt.Errorf("Application not found")
-	}
-	return app, nil
 }
 
 type ApplicationStorage struct {
