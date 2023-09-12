@@ -17,6 +17,7 @@ import (
 var msc *db.MySQLClient
 var err error
 var mq queue.MessageQueueWriter
+var as db.ApplicationStorer
 
 var NextChatID atomic.Uint64
 
@@ -27,7 +28,7 @@ func GetNextChatID() uint64 {
 func GetApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	name := vars["name"]
-	app, err := msc.ApplicationStorage.Read(name)
+	app, err := as.GetApplication(name)
 	if err != nil {
 		logrus.Info("Error in fetching application", err)
 	}
@@ -42,7 +43,7 @@ func GetApplication(w http.ResponseWriter, r *http.Request) {
 }
 
 func GetApplications(w http.ResponseWriter, r *http.Request) {
-	app, err := msc.ApplicationStorage.ReadAll()
+	app, err := as.GetAll()
 	if err != nil {
 		logrus.Info("Error in fetching applications", err)
 	}
@@ -65,7 +66,7 @@ func CreateApplication(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
-	err = msc.ApplicationStorage.Write(app)
+	err = as.CreateApplication(app)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 	}
@@ -123,6 +124,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	as, err = db.NewApplicationSQLStorage("admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb")
 
 	router := mux.NewRouter()
 

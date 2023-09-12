@@ -19,9 +19,9 @@ import (
 )
 
 type ApplicationStorer interface {
-	CreateApplication()
-	GetApplication()
-	GetAll()
+	CreateApplication(string) error
+	GetApplication(string) (*types.Application, error)
+	GetAll() ([]any, error)
 }
 
 type ChatStorer interface {
