@@ -72,12 +72,15 @@ func CreateApplication(w http.ResponseWriter, r *http.Request) {
 }
 
 func CreateChat(w http.ResponseWriter, r *http.Request) {
-	// the chat number which should be constantly incremented
 	vars := mux.Vars(r)
-	token := vars["token"]
-	chatNumber := strconv.Itoa(int(GetNextChatID()))
+	token := vars["name"]
 
-	// get chat number
+	if _, err := msc.ApplicationStorage.Read(token); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	} // swap out with actual token
+
+	chatNumber := strconv.Itoa(int(GetNextChatID()))
 
 	createChatMessage := map[string]string{
 		"applicationToken": token,
@@ -116,7 +119,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	mq, err = queue.NewRabbitMQWriter("localhost:5679")
+	mq, err = queue.NewRabbitMQWriter("amqp://client-py:st@yhungry@ac7622565a1044e58a9e4a088efcd05d-190314016.eu-west-1.elb.amazonaws.com:5672/")
 	if err != nil {
 		log.Fatal(err)
 	}

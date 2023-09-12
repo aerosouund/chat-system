@@ -14,7 +14,8 @@ type RabbitMQWriter struct {
 }
 
 func NewRabbitMQWriter(endpoint string) (*RabbitMQWriter, error) {
-	connection, err := amqp.Dial("amqp://guest:guest@localhost:5672/")
+	defer logrus.Info("Started RabbitMQ client")
+	connection, err := amqp.Dial(endpoint)
 	if err != nil {
 		return nil, err
 	}
