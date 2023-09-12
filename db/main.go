@@ -18,6 +18,83 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type ApplicationStorer interface {
+	CreateApplication()
+	GetApplication()
+	UpdateApplication()
+	DeleteApplication()
+}
+
+type ChatStorer interface {
+	CreateChat()
+	UpdateChat()
+	DeleteChat()
+}
+
+type ApplicationSQLStorage struct {
+	DB *sql.DB
+}
+
+func NewApplicationSQLStorage(endpoint string) (*ApplicationSQLStorage, error) {
+	// what does this actually achieve ? centralized table access ? if it doesnt abstract storage then its useless
+	db, err := sql.Open("mysql", endpoint)
+
+	if err != nil {
+		return nil, err
+	}
+
+	db.SetConnMaxLifetime(time.Minute * 3)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
+	asc := &ApplicationSQLStorage{
+		DB: db,
+	}
+	logrus.Info("Application MySQL client initialized")
+
+	return asc, nil
+}
+
+func (asc *ApplicationSQLStorage) CreateApplication(appname string) error {
+	var exists bool
+	row := asc.DB.QueryRow("SELECT EXISTS(SELECT * FROM applications WHERE name=?);", appname) // sql injection ?
+	if err := row.Scan(&exists); err != nil {
+		fmt.Println(err.Error())
+		return err
+	} else if !exists {
+		token := generateToken()
+
+		if _, err := asc.DB.Exec("INSERT INTO applications (`name`, `token`, `chat_count`) VALUES (?, ?, 0)", appname, token); err != nil {
+			return err
+		}
+		logrus.Info("Wrote application into db")
+	} else if exists {
+		logrus.Error("Application already exists")
+		return fmt.Errorf("Application already exists")
+	}
+	return nil
+}
+
+func (asc *ApplicationSQLStorage) GetApplication(appname string) (*types.Application, error) {
+	var app types.Application
+	res, err := asc.DB.Query("SELECT * FROM applications WHERE name=?", appname)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	for res.Next() {
+		err = res.Scan(&app.Name, &app.Token, &app.ChatCount)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if app == (types.Application{}) {
+		return nil, fmt.Errorf("Application not found")
+	}
+	return &app, nil
+}
+
+//---------------------------------------------------//
+
 type SqlStorage interface {
 	Write(record map[string]string) error
 	Read(idx string) (any, error)
