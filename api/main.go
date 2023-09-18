@@ -168,7 +168,14 @@ func main() {
 	}
 
 	as, err = db.NewApplicationSQLStorage(dbString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	cs, err = db.NewChatSQLStorage(dbString)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	router := mux.NewRouter()
 	MakeHTTPTransport(router)
