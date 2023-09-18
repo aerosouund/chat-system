@@ -14,7 +14,6 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var msc *db.MySQLClient
 var mq queue.MessageQueueWriter
 var as db.ApplicationStorer
 var cs db.ChatStorer
@@ -147,10 +146,7 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
 	fmt.Fprintf(w, string(jsonResponse))
-
-	// write message in the queue
 }
 
 func writeJSON(rw http.ResponseWriter, status int, v any) error {
