@@ -19,23 +19,27 @@ import (
 )
 
 type ApplicationStorer interface {
-	CreateApplication(string) error
+	CreateApplication(string) (*types.Application, error)
 	GetApplication(string) (*types.Application, error)
-	GetAll() ([]any, error)
+	GetAll() ([]any, error) // implement delete
 }
 
 type ChatStorer interface {
-	CreateChat()
-	UpdateChat()
-	DeleteChat()
+	CreateChat(string, int) (*types.Chat, error)
+	GetChat(string, int) (*types.Chat, error)
+	GetAllAppChats(string) ([]any, error)
+	// DeleteChat(string) error
 }
 
 type ApplicationSQLStorage struct {
 	DB *sql.DB
 }
 
+type ChatSQLStorage struct {
+	DB *sql.DB
+}
+
 func NewApplicationSQLStorage(endpoint string) (*ApplicationSQLStorage, error) {
-	// what does this actually achieve ? centralized table access ? if it doesnt abstract storage then its useless
 	db, err := sql.Open("mysql", endpoint)
 
 	if err != nil {
@@ -53,24 +57,101 @@ func NewApplicationSQLStorage(endpoint string) (*ApplicationSQLStorage, error) {
 	return asc, nil
 }
 
-func (asc *ApplicationSQLStorage) CreateApplication(appname string) error {
+func NewChatSQLStorage(endpoint string) (*ChatSQLStorage, error) {
+	db, err := sql.Open("mysql", endpoint)
+
+	if err != nil {
+		return nil, err
+	}
+
+	db.SetConnMaxLifetime(time.Minute * 3)
+	db.SetMaxOpenConns(10)
+	db.SetMaxIdleConns(10)
+	csc := &ChatSQLStorage{
+		DB: db,
+	}
+	logrus.Info("Chat MySQL client initialized")
+
+	return csc, nil
+}
+
+func (csc *ChatSQLStorage) GetChat(applicationToken string, chatNum int) (*types.Chat, error) {
+	var chat types.Chat
+	res, err := csc.DB.Query("SELECT * FROM chats WHERE token=? & chat_number", applicationToken, chatNum)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+	for res.Next() {
+		err = res.Scan(&chat.Application, &chat.Number, &chat.MessageCount)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if chat == (types.Chat{}) {
+		return nil, fmt.Errorf("Chat not found")
+	}
+	return &chat, nil
+}
+
+func (csc *ChatSQLStorage) CreateChat(applicationToken string, chatNum int) (*types.Chat, error) {
 	var exists bool
+	var chat *types.Chat
+	row := csc.DB.QueryRow("SELECT EXISTS(SELECT * FROM chats WHERE chat_number=?);", chatNum) // sql injection ?
+	if err := row.Scan(&exists); err != nil {
+		fmt.Println(err.Error())
+		return nil, err
+	} else if !exists {
+		if _, err := csc.DB.Exec("INSERT INTO chats (`token`,`chat_number`, `message_count`) VALUES (?, 0, 0)", applicationToken); err != nil {
+			return nil, err
+		}
+		if _, err := csc.DB.Exec("UPDATE applications SET chat_count = chat_count + 1 WHERE name=?;)", applicationToken); err != nil {
+			return nil, err
+		}
+		logrus.Info("Wrote chat into db")
+	} else if exists {
+		logrus.Error("Chat already exists")
+		return nil, fmt.Errorf("Chat already exists")
+	}
+	chat = types.NewChat(applicationToken, chatNum)
+	return chat, nil
+}
+
+func (csc *ChatSQLStorage) GetAllAppChats(applicationToken string) ([]any, error) {
+	var chats []any
+	res, err := csc.DB.Query("SELECT * FROM chats WHERE token=?", applicationToken)
+
+	if err != nil {
+		logrus.Error("Unable to read chats,", err)
+	}
+
+	for res.Next() {
+		var chat types.Chat
+		res.Scan(&chat.Application, &chat.Number, &chat.MessageCount)
+		chats = append(chats, chat)
+	}
+	return chats, nil
+}
+
+func (asc *ApplicationSQLStorage) CreateApplication(appname string) (*types.Application, error) {
+	var exists bool
+	var token string
 	row := asc.DB.QueryRow("SELECT EXISTS(SELECT * FROM applications WHERE name=?);", appname) // sql injection ?
 	if err := row.Scan(&exists); err != nil {
 		fmt.Println(err.Error())
-		return err
+		return nil, err
 	} else if !exists {
-		token := generateToken()
+		token = generateToken()
 
 		if _, err := asc.DB.Exec("INSERT INTO applications (`name`, `token`, `chat_count`) VALUES (?, ?, 0)", appname, token); err != nil {
-			return err
+			return nil, err
 		}
 		logrus.Info("Wrote application into db")
 	} else if exists {
 		logrus.Error("Application already exists")
-		return fmt.Errorf("Application already exists")
+		return nil, fmt.Errorf("Application already exists")
 	}
-	return nil
+	return types.NewApplication(appname, token), nil
 }
 
 func (asc *ApplicationSQLStorage) GetApplication(appname string) (*types.Application, error) {
@@ -176,11 +257,6 @@ func NewMySQLClient(endpoint string) (*MySQLClient, error) {
 		DB: db,
 	}
 
-	as := ApplicationStorage{
-		client: msc,
-	}
-
-	msc.ApplicationStorage = &as
 	logrus.Info("MySQL client initialized")
 
 	return msc, nil
@@ -204,25 +280,6 @@ func (as *ApplicationStorage) Write(record map[string]string) error {
 		return fmt.Errorf("Application already exists")
 	}
 	return nil
-}
-
-func (as *ApplicationStorage) Read(token string) (any, error) {
-	var app types.Application
-	res, err := as.client.DB.Query("SELECT * FROM applications WHERE name=?", token)
-
-	if err != nil {
-		log.Fatal(err)
-	}
-	for res.Next() {
-		err = res.Scan(&app.Name, &app.Token, &app.ChatCount)
-		if err != nil {
-			return nil, err
-		}
-	}
-	if app == (types.Application{}) {
-		return nil, fmt.Errorf("Application not found")
-	}
-	return app, nil
 }
 
 func (as *ApplicationStorage) ReadAll() ([]any, error) {

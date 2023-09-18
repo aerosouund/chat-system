@@ -18,3 +18,17 @@ type Application struct {
 	Token     string `json:"token"`
 	ChatCount int    `json:"chatCount"`
 }
+
+func NewApplication(name, token string) *Application {
+	return &Application{
+		Name:  name,
+		Token: token,
+	}
+}
+
+func NewChat(applicationToken string, chatNum int) *Chat {
+	return &Chat{
+		Application: applicationToken,
+		Number:      chatNum,
+	}
+}
