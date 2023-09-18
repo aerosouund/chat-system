@@ -19,6 +19,7 @@ var as db.ApplicationStorer
 var cs db.ChatStorer
 
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
+const queueName = "chats"
 const mqttString = "amqp://client-py:st@yhungry@ac7622565a1044e58a9e4a088efcd05d-190314016.eu-west-1.elb.amazonaws.com:5672/"
 
 var NextChatID atomic.Uint64
@@ -132,7 +133,7 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = mq.Write("chats", string(jsonString))
+	err = mq.Write(queueName, string(jsonString))
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, err.Error())
 		return

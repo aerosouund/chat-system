@@ -189,14 +189,6 @@ func (asc *ApplicationSQLStorage) GetAll() ([]any, error) {
 	return apps, nil
 }
 
-//---------------------------------------------------//
-
-type SqlStorage interface {
-	Write(record map[string]string) error
-	Read(idx string) (any, error)
-	ReadAll() ([]any, error)
-}
-
 type KVStorage interface {
 	Write(ctx context.Context, key string, val string) error
 	Read(ctx context.Context, key string) (string, error)

@@ -1,6 +1,6 @@
-db:
-	@go build -o bin/db db/main.go
-	@./bin/db
+consumer:
+	@go build -o bin/consumer consumer/main.go
+	@./bin/consumer
 
 apiserver:
 	@go build -o bin/api api/main.go
