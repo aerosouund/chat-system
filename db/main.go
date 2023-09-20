@@ -102,10 +102,10 @@ func (csc *ChatSQLStorage) CreateChat(applicationToken string, chatNum int) (*ty
 		fmt.Println(err.Error())
 		return nil, err
 	} else if !exists {
-		if _, err := csc.DB.Exec("INSERT INTO chats (`token`,`chat_number`, `message_count`) VALUES (?, 0, 0)", applicationToken); err != nil {
+		if _, err := csc.DB.Exec("INSERT INTO chats (`token`,`chat_number`, `message_count`) VALUES (?, ?, 0)", applicationToken, chatNum); err != nil {
 			return nil, err
 		}
-		if _, err := csc.DB.Exec("UPDATE applications SET chat_count = chat_count + 1 WHERE name=?;)", applicationToken); err != nil {
+		if _, err := csc.DB.Exec("UPDATE applications SET chat_count = chat_count + 1 WHERE token=?;)", applicationToken); err != nil {
 			return nil, err
 		}
 		logrus.Info("Wrote chat into db")

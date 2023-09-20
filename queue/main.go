@@ -42,12 +42,11 @@ func NewRabbitMQReader(endpoint string) (*RabbitMQReader, error) {
 		return nil, err
 	}
 	return &RabbitMQReader{
-		Client:      connection,
-		MessageChan: make(<-chan amqp.Delivery),
+		Client: connection,
 	}, nil
 }
 
-func (rmqr *RabbitMQReader) Read(queueName string) error {
+func (rmqr *RabbitMQReader) Read(destChan chan []byte, queueName string) error {
 
 	ch, err := rmqr.Client.Channel()
 	if err != nil {
@@ -81,6 +80,9 @@ func (rmqr *RabbitMQReader) Read(queueName string) error {
 		return err
 	}
 	rmqr.MessageChan = msgs
+	for msg := range rmqr.MessageChan {
+		destChan <- msg.Body
+	} // how can we make this better ?
 	return nil
 }
 
@@ -90,6 +92,7 @@ func (rmqr *RabbitMQReader) CloseRecvChan() {
 }
 
 func (rmqw *RabbitMQWriter) Write(queueName, message string) error {
+	fmt.Println("about to publish", message)
 	channel, err := rmqw.Client.Channel()
 	if err != nil {
 		return err
