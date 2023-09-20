@@ -17,10 +17,12 @@ import (
 var mq queue.MessageQueueWriter
 var as db.ApplicationStorer
 var cs db.ChatStorer
+var kvs db.KVStorage
 
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
 const queueName = "chats"
 const mqttString = "amqp://client-py:st@yhungry@ac7622565a1044e58a9e4a088efcd05d-190314016.eu-west-1.elb.amazonaws.com:5672/"
+const redisURL = "a1885c2f187ac44ba9d66f258773d630-1261174797.eu-west-1.elb.amazonaws.com"
 
 var NextChatID atomic.Uint64
 
@@ -120,6 +122,9 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	} // swap out with actual token
 
+	// try to read the cache and if it doesnt exist create a cache key with val 0
+	// if exists the chat number is the value
+
 	chatNumber := strconv.Itoa(int(GetNextChatID()))
 
 	createChatMessage := map[string]string{
@@ -170,6 +175,11 @@ func main() {
 	}
 
 	cs, err = db.NewChatSQLStorage(dbString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	kvs, err = db.NewRedisStorage(redisURL)
 	if err != nil {
 		log.Fatal(err)
 	}

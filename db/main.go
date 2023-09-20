@@ -216,15 +216,15 @@ func (rs *RedisStorage) Read(ctx context.Context, key string) (string, error) {
 	return val, nil
 }
 
-func NewRedisStorage(endpoint string) *RedisStorage {
+func NewRedisStorage(endpoint string) (*RedisStorage, error) {
 	opt, err := redis.ParseURL(endpoint)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	return &RedisStorage{
 		client: redis.NewClient(opt),
-	}
+	}, nil
 }
 
 func generateToken() string {
