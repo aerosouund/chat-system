@@ -12,7 +12,8 @@ type MessageQueueWriter interface {
 }
 
 type MessageQueueReader interface {
-	Read(string) error
+	Read(chan []byte, string) error
+	CloseRecvChan()
 }
 
 type RabbitMQWriter struct {
