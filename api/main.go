@@ -3,6 +3,7 @@ package main
 import (
 	"chat-system/db"
 	"chat-system/queue"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -22,7 +23,7 @@ var kvs db.KVStorage
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
 const queueName = "chats"
 const mqttString = "amqp://client-py:st@yhungry@ac7622565a1044e58a9e4a088efcd05d-190314016.eu-west-1.elb.amazonaws.com:5672/"
-const redisURL = "a1885c2f187ac44ba9d66f258773d630-1261174797.eu-west-1.elb.amazonaws.com"
+const redisURL = "redis://a1885c2f187ac44ba9d66f258773d630-100103902.eu-west-1.elb.amazonaws.com:6379/1"
 
 var NextChatID atomic.Uint64
 
@@ -32,7 +33,7 @@ func GetNextChatID() uint64 {
 
 func GetApplication(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
-	name := vars["name"]
+	name := vars["token"]
 	app, err := as.GetApplication(name)
 	if err != nil {
 		logrus.Info("Error in fetching application", err)
@@ -61,6 +62,17 @@ func GetApplications(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+}
+
+func DeleteApplication(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	token := vars["token"]
+
+	err := as.DeleteApplication(token)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 }
 
 func CreateApplication(w http.ResponseWriter, r *http.Request) {
@@ -118,18 +130,34 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 	token := vars["token"]
 
 	if _, err := as.GetApplication(token); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeJSON(w, http.StatusInternalServerError, err.Error())
 		return
-	} // swap out with actual token
+	}
 
-	// try to read the cache and if it doesnt exist create a cache key with val 0
-	// if exists the chat number is the value
+	ctx := context.Background()
 
-	chatNumber := strconv.Itoa(int(GetNextChatID()))
+	chatNumStr, err := kvs.Read(ctx, token)
+	if err != nil {
+		err = kvs.Write(ctx, token, "0")
+		chatNumStr = "0"
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+	}
+	chatNum, _ := strconv.Atoi(chatNumStr)
+	newChatNum := chatNum + 1
+	newChatNumStr := strconv.Itoa(newChatNum)
+	err = kvs.Write(ctx, token, newChatNumStr)
+
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
 
 	createChatMessage := map[string]string{
 		"applicationToken": token,
-		"chatNumber":       chatNumber,
+		"chatNumber":       newChatNumStr,
 	}
 
 	jsonString, err := json.Marshal(createChatMessage)
@@ -144,7 +172,7 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	response := map[string]string{
-		"chatNumber": chatNumber,
+		"chatNumber": newChatNumStr,
 	}
 	jsonResponse, err := json.Marshal(response)
 	if err != nil {
@@ -194,11 +222,12 @@ func main() {
 func MakeHTTPTransport(router *mux.Router) {
 	router.HandleFunc("/applications", GetApplications).Methods("GET")
 	router.HandleFunc("/applications/{name}", CreateApplication).Methods("POST")
-	router.HandleFunc("/applications/{name}", GetApplication).Methods("GET")
+	router.HandleFunc("/applications/{token}", GetApplication).Methods("GET")
 
 	router.HandleFunc("/applications/{token}/chats", CreateChat).Methods("POST")
-	router.HandleFunc("/applications/{name}/chats/{id}", GetChat).Methods("GET")
-	router.HandleFunc("/applications/{name}/chats", GetApplicationChats).Methods("GET")
+	router.HandleFunc("/applications/{token}/chats/{id}", GetChat).Methods("GET")
+	router.HandleFunc("/applications/{token}/chats", GetApplicationChats).Methods("GET")
+	router.HandleFunc("/applications/{token}", DeleteApplication).Methods("POST")
 
 	http.Handle("/", router)
 	logrus.Info("Api server initialized")

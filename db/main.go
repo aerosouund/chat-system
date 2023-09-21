@@ -22,6 +22,7 @@ type ApplicationStorer interface {
 	CreateApplication(string) (*types.Application, error)
 	GetApplication(string) (*types.Application, error)
 	GetAll() ([]any, error) // implement delete
+	DeleteApplication(string) error
 }
 
 type ChatStorer interface {
@@ -97,7 +98,7 @@ func (csc *ChatSQLStorage) GetChat(applicationToken string, chatNum int) (*types
 func (csc *ChatSQLStorage) CreateChat(applicationToken string, chatNum int) (*types.Chat, error) {
 	var exists bool
 	var chat *types.Chat
-	row := csc.DB.QueryRow("SELECT EXISTS(SELECT * FROM chats WHERE chat_number=?);", chatNum) // sql injection ?
+	row := csc.DB.QueryRow("SELECT EXISTS(SELECT * FROM chats WHERE chat_number=? and token=?);", chatNum, applicationToken) // sql injection ?
 	if err := row.Scan(&exists); err != nil {
 		fmt.Println(err.Error())
 		return nil, err
@@ -105,12 +106,12 @@ func (csc *ChatSQLStorage) CreateChat(applicationToken string, chatNum int) (*ty
 		if _, err := csc.DB.Exec("INSERT INTO chats (`token`,`chat_number`, `message_count`) VALUES (?, ?, 0)", applicationToken, chatNum); err != nil {
 			return nil, err
 		}
-		if _, err := csc.DB.Exec("UPDATE applications SET chat_count = chat_count + 1 WHERE token=?;)", applicationToken); err != nil {
+		if _, err := csc.DB.Exec("UPDATE applications SET chat_count = chat_count + 1 WHERE token=?", applicationToken); err != nil {
 			return nil, err
 		}
 		logrus.Info("Wrote chat into db")
 	} else if exists {
-		logrus.Error("Chat already exists")
+		logrus.Error("Chat already exists") // remove all instances of logrus and return errors only, logging done in the logmiddleware
 		return nil, fmt.Errorf("Chat already exists")
 	}
 	chat = types.NewChat(applicationToken, chatNum)
@@ -173,6 +174,16 @@ func (asc *ApplicationSQLStorage) GetApplication(applicationToken string) (*type
 	return &app, nil
 }
 
+func (asc *ApplicationSQLStorage) DeleteApplication(applicationToken string) error {
+	_, err := asc.DB.Query("DELETE FROM applications WHERE token=?", applicationToken)
+	_, err = asc.DB.Query("DELETE FROM chats WHERE token=?", applicationToken)
+
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func (asc *ApplicationSQLStorage) GetAll() ([]any, error) {
 	var apps []any
 	res, err := asc.DB.Query("SELECT * FROM applications")
@@ -199,24 +210,24 @@ type RedisStorage struct {
 }
 
 func (rs *RedisStorage) Write(ctx context.Context, key string, val string) error {
-	err := rs.client.Set(ctx, "foo", "bar", 0).Err()
+	err := rs.client.Set(ctx, key, val, 0).Err()
 	if err != nil {
-		return nil
+		return err
 	}
 
 	return nil
 }
 
 func (rs *RedisStorage) Read(ctx context.Context, key string) (string, error) {
-	val, err := rs.client.Get(ctx, "foo").Result()
+	val, err := rs.client.Get(ctx, key).Result()
 	if err != nil {
 		return "", err
 	}
-	fmt.Println(val)
 	return val, nil
 }
 
 func NewRedisStorage(endpoint string) (*RedisStorage, error) {
+	defer logrus.Info("Redis Client Initialized")
 	opt, err := redis.ParseURL(endpoint)
 	if err != nil {
 		return nil, err

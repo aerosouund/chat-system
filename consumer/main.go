@@ -5,7 +5,9 @@ import (
 	"chat-system/queue"
 	"encoding/json"
 	"fmt"
+	"log"
 	"strconv"
+	"time"
 )
 
 var mqr queue.MessageQueueReader
@@ -20,40 +22,45 @@ func main() {
 
 	mqr, err = queue.NewRabbitMQReader(mqttString)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
+	defer mqr.CloseRecvChan()
+
 	cs, err = db.NewChatSQLStorage(dbString)
 	if err != nil {
-		panic(err)
+		log.Fatal(err)
 	}
 	destChan := make(chan []byte)
+	killCh := make(chan struct{})
 
 	go mqr.Read(destChan, queueName)
 
-	killCh := make(chan struct{})
-
 	go func() {
-		select {
-		case message := <-destChan:
-			var jsonMessage map[string]string
-			fmt.Println("message:", string(message))
+		for {
+			select {
+			case message := <-destChan:
+				var jsonMessage map[string]string
+				fmt.Println("message:", string(message))
 
-			err := json.Unmarshal(message, &jsonMessage)
-			if err != nil {
-				fmt.Println("invalid message, ", string(message))
-			}
-			token := jsonMessage["token"]
-			chatNum, _ := strconv.Atoi(jsonMessage["chatNum"])
-			_, err = cs.CreateChat(token, chatNum)
+				err := json.Unmarshal(message, &jsonMessage)
+				if err != nil {
+					fmt.Println("invalid message, ", string(message))
+				}
+				token := jsonMessage["applicationToken"]
+				chatNum, _ := strconv.Atoi(jsonMessage["chatNumber"])
+				_, err = cs.CreateChat(token, chatNum)
 
-			if err != nil {
-				fmt.Println("failed to put chat in the DB")
+				if err != nil {
+					fmt.Println("failed to put chat in the DB", err)
+				}
+			case <-killCh:
+				mqr.CloseRecvChan()
+				return
+			default:
+				time.Sleep(time.Second * 2)
 			}
-		case <-killCh:
-			mqr.CloseRecvChan()
-			return
+
 		}
-
 	}()
 
 	<-killCh
