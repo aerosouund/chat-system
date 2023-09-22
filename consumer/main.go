@@ -12,6 +12,7 @@ import (
 
 var mqr queue.MessageQueueReader
 var cs db.ChatStorer
+var osc *db.OpenSearchClient
 
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
 const queueName = "chats"
@@ -27,6 +28,11 @@ func main() {
 	defer mqr.CloseRecvChan()
 
 	cs, err = db.NewChatSQLStorage(dbString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	osc, err = db.NewOpenSearchClient("https://search-staging-z3rrlu65yks6qbepqvweu5cm7q.eu-west-1.es.amazonaws.com", "admin", "Foob@r00")
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,10 +54,15 @@ func main() {
 				}
 				token := jsonMessage["applicationToken"]
 				chatNum, _ := strconv.Atoi(jsonMessage["chatNumber"])
-				_, err = cs.CreateChat(token, chatNum)
 
+				_, err = cs.CreateChat(token, chatNum) // a sync worker to make sure that both of these operations ?
 				if err != nil {
 					fmt.Println("failed to put chat in the DB", err)
+				}
+
+				err = osc.CreateIndex(token + "+" + jsonMessage["chat"])
+				if err != nil {
+					fmt.Println("Failed to create elasticsearch index for chat", err)
 				}
 			case <-killCh:
 				mqr.CloseRecvChan()

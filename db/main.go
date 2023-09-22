@@ -12,6 +12,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -251,10 +252,10 @@ func NewOpenSearchClient(endpoint, user, password string) (*OpenSearchClient, er
 	defer logrus.Info("Opensearch Client Initialized")
 	client, err := opensearch.NewClient(opensearch.Config{
 		Transport: &http.Transport{
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // For testing only. Use certificate for validation.
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 		Addresses: []string{endpoint},
-		Username:  user, // For testing only. Don't store credentials in code.
+		Username:  user,
 		Password:  password,
 	})
 	if err != nil {
@@ -298,7 +299,7 @@ func (osc *OpenSearchClient) PutDocument(idxName, applicationToken, body string,
 		MessageNumber: messageNumber,
 	}
 
-	docId := "1" // compute some sort of checksum
+	docId := strconv.Itoa(messageNumber) // compute some sort of checksum
 
 	req := opensearchapi.IndexRequest{
 		Index:      idxName,
