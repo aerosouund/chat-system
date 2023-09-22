@@ -4,16 +4,22 @@ import (
 	"chat-system/types"
 	"context"
 	"crypto/sha256"
+	"crypto/tls"
 	"database/sql"
 	"encoding/hex"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
+	"net/http"
+	"strings"
 	"time"
 
 	_ "github.com/go-sql-driver/mysql"
 
+	opensearchapi "github.com/opensearch-project/opensearch-go/opensearchapi"
+	"github.com/opensearch-project/opensearch-go/opensearchutil"
+	opensearch "github.com/opensearch-project/opensearch-go/v2"
 	"github.com/redis/go-redis/v9"
 	"github.com/sirupsen/logrus"
 )
@@ -237,8 +243,78 @@ func NewRedisStorage(endpoint string) (*RedisStorage, error) {
 	}, nil
 }
 
-type ElasticSearchClient struct {
+type OpenSearchClient struct {
+	Client *opensearch.Client
 }
+
+func NewOpenSearchClient(endpoint, user, password string) (*OpenSearchClient, error) {
+	defer logrus.Info("Opensearch Client Initialized")
+	client, err := opensearch.NewClient(opensearch.Config{
+		Transport: &http.Transport{
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true}, // For testing only. Use certificate for validation.
+		},
+		Addresses: []string{endpoint},
+		Username:  user, // For testing only. Don't store credentials in code.
+		Password:  password,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &OpenSearchClient{
+		Client: client,
+	}, nil
+}
+
+func (osc *OpenSearchClient) CreateIndex(idxName string) error {
+	mapping := strings.NewReader(`{
+	    "settings": {
+	        "index": {
+	            "number_of_shards": 2
+	        }
+	    }
+	}`)
+
+	// Create an index with non-default settings.
+	createIndex := opensearchapi.IndicesCreateRequest{
+		Index: idxName,
+		Body:  mapping,
+	}
+	ctx := context.Background()
+
+	createIndexResponse, err := createIndex.Do(ctx, osc.Client)
+	if err != nil {
+		return err
+	}
+	fmt.Println(createIndexResponse)
+	return nil
+}
+
+func (osc *OpenSearchClient) PutDocument(idxName, applicationToken, body string, chatNumber, messageNumber int) error {
+	// helper function to get idx name based on token and chatnumber ?
+	document := types.ChatMessage{
+		Application:   applicationToken,
+		Body:          body,
+		ChatNumber:    chatNumber,
+		MessageNumber: messageNumber,
+	}
+
+	docId := "1" // compute some sort of checksum
+
+	req := opensearchapi.IndexRequest{
+		Index:      idxName,
+		DocumentID: docId,
+		Body:       opensearchutil.NewJSONReader(&document),
+	}
+	ctx := context.Background()
+	insertResponse, err := req.Do(ctx, osc.Client)
+	if err != nil {
+		return err
+	}
+	fmt.Println(insertResponse)
+	return nil
+}
+
+func (osc *OpenSearchClient) Search() {}
 
 func generateToken() string {
 	rand.Seed(time.Now().UnixNano())

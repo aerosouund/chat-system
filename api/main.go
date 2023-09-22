@@ -19,6 +19,7 @@ var mq queue.MessageQueueWriter
 var as db.ApplicationStorer
 var cs db.ChatStorer
 var kvs db.KVStorage
+var osc *db.OpenSearchClient
 
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
 const queueName = "chats"
@@ -166,7 +167,17 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = kvs.Write(context.Background(), token+"+"+newChatNumStr, "0") // check this for bugs
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
 	err = mq.Write(queueName, string(jsonString))
+	// create an elasticsearch index in the consumer, only create the message if the cache key exists
+	// to avoid message loss in case you're writing to a chat not yet created and to decrease the cost of the create message call
+	// and not have it do many checks
+
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, err.Error())
 		return
@@ -187,6 +198,38 @@ func writeJSON(rw http.ResponseWriter, status int, v any) error {
 	rw.WriteHeader(status)
 	rw.Header().Add("Content-Type", "application/json")
 	return json.NewEncoder(rw).Encode(v)
+}
+
+func CreateMessage(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	token := vars["token"]
+	chatNum := vars["id"]
+
+	var requestBody map[string]string
+	decoder := json.NewDecoder(r.Body)
+
+	if err := decoder.Decode(&requestBody); err != nil {
+		writeJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	ctx := context.Background()
+	var chatMessageCountKey = token + "+" + chatNum
+
+	chatMessageCountStr, err := kvs.Read(ctx, chatMessageCountKey)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+	chatMessageCount, _ := strconv.Atoi(chatMessageCountStr)
+	chatNumberInt, _ := strconv.Atoi(chatNum)
+	newMessageCount := chatMessageCount + 1
+	newMessageCountStr := strconv.Itoa(newMessageCount)
+
+	err = kvs.Write(ctx, chatMessageCountKey, newMessageCountStr)
+
+	err = osc.PutDocument(chatMessageCountKey, token, requestBody["body"], chatNumberInt, newMessageCount)
+
 }
 
 func main() {
@@ -212,11 +255,15 @@ func main() {
 		log.Fatal(err)
 	}
 
+	osc, err = db.NewOpenSearchClient("https://search-staging-z3rrlu65yks6qbepqvweu5cm7q.eu-west-1.es.amazonaws.com", "admin", "Foob@r00")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	router := mux.NewRouter()
 	MakeHTTPTransport(router)
 
 	// specify endpoints, handler functions and HTTP method
-
 }
 
 func MakeHTTPTransport(router *mux.Router) {
@@ -228,6 +275,8 @@ func MakeHTTPTransport(router *mux.Router) {
 	router.HandleFunc("/applications/{token}/chats/{id}", GetChat).Methods("GET")
 	router.HandleFunc("/applications/{token}/chats", GetApplicationChats).Methods("GET")
 	router.HandleFunc("/applications/{token}", DeleteApplication).Methods("POST")
+
+	router.HandleFunc("/applications/{token}/chats/{id}/messages", CreateMessage).Methods("post")
 
 	http.Handle("/", router)
 	logrus.Info("Api server initialized")
