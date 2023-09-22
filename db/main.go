@@ -29,7 +29,6 @@ type ChatStorer interface {
 	CreateChat(string, int) (*types.Chat, error)
 	GetChat(string, int) (*types.Chat, error)
 	GetAllAppChats(string) ([]any, error)
-	// DeleteChat(string) error
 }
 
 type ApplicationSQLStorage struct {
@@ -238,6 +237,9 @@ func NewRedisStorage(endpoint string) (*RedisStorage, error) {
 	}, nil
 }
 
+type ElasticSearchClient struct {
+}
+
 func generateToken() string {
 	rand.Seed(time.Now().UnixNano())
 	randomNum := rand.Intn(math.MaxInt)
@@ -248,6 +250,6 @@ func generateToken() string {
 	hashBytes := sha256Hash.Sum(nil)
 
 	hashHex := hex.EncodeToString(hashBytes)
-	randomString := hashHex[:8]
+	randomString := hashHex[:10]
 	return randomString
 }

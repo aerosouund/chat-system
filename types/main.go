@@ -32,3 +32,12 @@ func NewChat(applicationToken string, chatNum int) *Chat {
 		Number:      chatNum,
 	}
 }
+
+func NewChatMessage(applicationToken, messageBody string, chatNumber, messageNumber int) *ChatMessage {
+	return &ChatMessage{
+		Application:   applicationToken,
+		Body:          messageBody,
+		ChatNumber:    chatNumber,
+		MessageNumber: messageNumber,
+	}
+}
