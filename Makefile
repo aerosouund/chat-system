@@ -3,7 +3,7 @@ consumer:
 	@./bin/cons
 
 apiserver:
-	@go build -o bin/api api/main.go
+	@go build -o bin/api api/*
 	@./bin/api
 
 .PHONY: apiserver consumer

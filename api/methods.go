@@ -146,7 +146,7 @@ func CreateChat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = kvs.Write(context.Background(), token+"+"+newChatNumStr, "0") // check this for bugs
+	err = kvs.Write(context.Background(), token+"-"+newChatNumStr, "0") // check this for bugs
 	if err != nil {
 		writeJSON(w, http.StatusInternalServerError, err.Error())
 		return
@@ -193,7 +193,7 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ctx := context.Background()
-	var chatMessageCountKey = token + "+" + chatNum
+	var chatMessageCountKey = token + "-" + chatNum
 
 	chatMessageCountStr, err := kvs.Read(ctx, chatMessageCountKey)
 	if err != nil {
@@ -208,5 +208,25 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 	err = kvs.Write(ctx, chatMessageCountKey, newMessageCountStr)
 
 	err = osc.PutDocument(chatMessageCountKey, token, requestBody["body"], chatNumberInt, newMessageCount)
+
+}
+
+func GetChatMessages(w http.ResponseWriter, r *http.Request) {
+	vars := mux.Vars(r)
+	token := vars["token"]
+	chatNum := vars["id"]
+
+	var chatMessageIdx = token + "-" + chatNum
+	messages, err := osc.GetChatMessages(chatMessageIdx)
+	fmt.Println(messages)
+	if err != nil {
+		writeJSON(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	jsonData, err := json.Marshal(messages)
+	w.Header().Set("Content-Type", "application/json")
+
+	_, err = w.Write(jsonData)
 
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"database/sql"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"log"
 	"math"
@@ -291,7 +292,6 @@ func (osc *OpenSearchClient) CreateIndex(idxName string) error {
 }
 
 func (osc *OpenSearchClient) PutDocument(idxName, applicationToken, body string, chatNumber, messageNumber int) error {
-	// helper function to get idx name based on token and chatnumber ?
 	document := types.ChatMessage{
 		Application:   applicationToken,
 		Body:          body,
@@ -315,7 +315,36 @@ func (osc *OpenSearchClient) PutDocument(idxName, applicationToken, body string,
 	return nil
 }
 
-func (osc *OpenSearchClient) Search() {}
+func (osc *OpenSearchClient) GetChatMessages(idxName string) ([]any, error) {
+	res, err := osc.Client.Search(
+		osc.Client.Search.WithIndex(idxName),
+	)
+	if err != nil {
+		log.Printf("error occurred: [%s]", err.Error())
+	}
+	buf := make([]byte, 1028)
+	n, err := res.Body.Read(buf)
+
+	var hits map[string]interface{}
+
+	var messages []any
+
+	err = json.Unmarshal(buf[:n], &hits)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON:", err)
+		return nil, err
+	}
+
+	hitsObject := hits["hits"].(map[string]interface{})
+	fmt.Println(hitsObject)
+	hitsArray := hitsObject["hits"].([]interface{})
+
+	// Print the extracted data
+	for _, hit := range hitsArray {
+		messages = append(messages, hit.(map[string]interface{})["_source"])
+	}
+	return messages, nil
+}
 
 func generateToken() string {
 	rand.Seed(time.Now().UnixNano())

@@ -67,7 +67,8 @@ func MakeHTTPTransport(router *mux.Router) {
 	router.HandleFunc("/applications/{token}/chats", GetApplicationChats).Methods("GET")
 	router.HandleFunc("/applications/{token}", DeleteApplication).Methods("POST")
 
-	router.HandleFunc("/applications/{token}/chats/{id}/messages", CreateMessage).Methods("post")
+	router.HandleFunc("/applications/{token}/chats/{id}/messages", CreateMessage).Methods("POST")
+	router.HandleFunc("/applications/{token}/chats/{id}/messages", GetChatMessages).Methods("GET")
 
 	http.Handle("/", router)
 	logrus.Info("Api server initialized")

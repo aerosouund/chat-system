@@ -7,6 +7,10 @@ type ChatMessage struct {
 	MessageNumber int    `json:"messageNumber"`
 }
 
+type Hit struct {
+	Hits map[string]map[string]interface{} `json:"hits"`
+}
+
 type Chat struct {
 	Application  string `json:"application"`
 	Number       int    `json:"number"`

@@ -57,12 +57,12 @@ func main() {
 				token := jsonMessage["applicationToken"]
 				chatNum, _ := strconv.Atoi(jsonMessage["chatNumber"])
 
-				_, err = cs.CreateChat(token, chatNum) // a sync worker to make sure that both of these operations ?
+				_, err = cs.CreateChat(token, chatNum)
 				if err != nil {
 					fmt.Println("failed to put chat in the DB", err)
 				}
 
-				err = osc.CreateIndex(token + "+" + jsonMessage["chat"])
+				err = osc.CreateIndex(token + "-" + jsonMessage["chatNumber"])
 				if err != nil {
 					fmt.Println("Failed to create elasticsearch index for chat", err)
 				}
