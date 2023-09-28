@@ -10,9 +10,11 @@ import (
 	"time"
 )
 
-var mqr queue.MessageQueueReader
-var cs db.ChatStorer
-var osc *db.OpenSearchClient
+var (
+	mqr queue.MessageQueueReader
+	cs  db.ChatStorer
+	osc *db.OpenSearchClient
+)
 
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
 const queueName = "chats"
