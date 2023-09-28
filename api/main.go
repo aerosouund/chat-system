@@ -55,8 +55,6 @@ func main() {
 
 	router := mux.NewRouter()
 	MakeHTTPTransport(router)
-
-	// specify endpoints, handler functions and HTTP method
 }
 
 func MakeHTTPTransport(router *mux.Router) {
@@ -74,6 +72,5 @@ func MakeHTTPTransport(router *mux.Router) {
 	http.Handle("/", router)
 	logrus.Info("Api server initialized")
 
-	// start and listen to requests
 	http.ListenAndServe(":8080", router)
 }
