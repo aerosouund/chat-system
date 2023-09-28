@@ -336,10 +336,8 @@ func (osc *OpenSearchClient) GetChatMessages(idxName string) ([]any, error) {
 	}
 
 	hitsObject := hits["hits"].(map[string]interface{})
-	fmt.Println(hitsObject)
 	hitsArray := hitsObject["hits"].([]interface{})
 
-	// Print the extracted data
 	for _, hit := range hitsArray {
 		messages = append(messages, hit.(map[string]interface{})["_source"])
 	}
