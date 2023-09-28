@@ -15,11 +15,13 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-var mq queue.MessageQueueWriter
-var as db.ApplicationStorer
-var cs db.ChatStorer
-var kvs db.KVStorage
-var osc *db.OpenSearchClient
+var (
+	mq  queue.MessageQueueWriter
+	as  db.ApplicationStorer
+	cs  db.ChatStorer
+	kvs db.KVStorage
+	osc *db.OpenSearchClient
+)
 
 const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
 const queueName = "chats"
