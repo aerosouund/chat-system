@@ -21,10 +21,13 @@ func (ms *MessageServer) HandleGetChatMessages(routerVars map[string]string, w h
 			return
 		}
 
-		jsonData, _ := json.Marshal(messages)
-		w.Header().Set("Content-Type", "application/json")
+		jsonData, err := json.Marshal(messages)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, err.Error())
+			return
+		}
 
-		_, err = w.Write(jsonData)
+		writeJSON(w, http.StatusOK, jsonData)
 	}
 }
 
