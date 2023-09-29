@@ -211,7 +211,7 @@ func CreateMessage(w http.ResponseWriter, r *http.Request) {
 
 }
 
-func GetChatMessages(w http.ResponseWriter, r *http.Request) {
+func (ms *MessageServer) GetChatMessages(w http.ResponseWriter, r *http.Request) {
 	vars := mux.Vars(r)
 	token := vars["token"]
 	chatNum := vars["id"]
@@ -229,4 +229,39 @@ func GetChatMessages(w http.ResponseWriter, r *http.Request) {
 
 	_, err = w.Write(jsonData)
 
+}
+
+func GetRouterVars(r *http.Request) map[string]string {
+	return mux.Vars(r)
+}
+
+type ExecFunc func(map[string]string, http.ResponseWriter, *http.Request) HttpHandlerFunc
+type HttpHandlerFunc func(http.ResponseWriter, *http.Request)
+
+func (ms *MessageServer) GetMuxVarsMiddleware(f ExecFunc) HttpHandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		vars := GetRouterVars(r)
+		f(vars, w, r)
+	}
+}
+
+func (ms *MessageServer) HandleGetMessage(routerVars map[string]string, w http.ResponseWriter, r *http.Request) HttpHandlerFunc {
+
+	token := routerVars["token"]
+	chatNum := routerVars["id"]
+
+	var chatMessageIdx = token + "-" + chatNum
+	messages, err := osc.GetChatMessages(chatMessageIdx)
+
+	return func(http.ResponseWriter, *http.Request) {
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		jsonData, _ := json.Marshal(messages)
+		w.Header().Set("Content-Type", "application/json")
+
+		_, err = w.Write(jsonData)
+	}
 }
