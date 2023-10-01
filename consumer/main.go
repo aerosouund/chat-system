@@ -10,31 +10,30 @@ import (
 	"time"
 )
 
-var (
-	mqr queue.MessageQueueReader
-	cs  db.ChatStorer
-	osc *db.OpenSearchClient
+const (
+	dbString   = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
+	queueName  = "chats"
+	mqttString = "amqp://client-py:st@yhungry@ac7622565a1044e58a9e4a088efcd05d-190314016.eu-west-1.elb.amazonaws.com:5672/"
+	osUrl      = "https://search-staging-z3rrlu65yks6qbepqvweu5cm7q.eu-west-1.es.amazonaws.com"
+	osUser     = "admin"
+	osPass     = "Foob@r00"
 )
-
-const dbString = "admin:ammaryasser@tcp(universe.cbrsnlipsjis.eu-west-1.rds.amazonaws.com:3306)/testdb"
-const queueName = "chats"
-const mqttString = "amqp://client-py:st@yhungry@ac7622565a1044e58a9e4a088efcd05d-190314016.eu-west-1.elb.amazonaws.com:5672/"
 
 func main() {
 	var err error
 
-	mqr, err = queue.NewRabbitMQReader(mqttString)
+	mqr, err := queue.NewRabbitMQReader(mqttString)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer mqr.CloseRecvChan()
 
-	cs, err = db.NewChatSQLStorage(dbString)
+	cs, err := db.NewChatSQLStorage(dbString)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	osc, err = db.NewOpenSearchClient("https://search-staging-z3rrlu65yks6qbepqvweu5cm7q.eu-west-1.es.amazonaws.com", "admin", "Foob@r00")
+	osc, err := db.NewOpenSearchClient(osUrl, osUser, osPass)
 	if err != nil {
 		log.Fatal(err)
 	}

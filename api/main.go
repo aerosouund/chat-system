@@ -15,8 +15,8 @@ const (
 )
 
 func main() {
-	as, cs, ms := initDependencies()
+	appserver, chatserver, messageserver := initDependencies()
 
 	router := mux.NewRouter()
-	MakeHTTPTransport(as, cs, ms, router)
+	MakeHTTPTransport(appserver, chatserver, messageserver, router)
 }
