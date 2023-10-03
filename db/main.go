@@ -315,6 +315,36 @@ func (osc *OpenSearchClient) PutDocument(idxName, applicationToken, body string,
 	return nil
 }
 
+func (osc *OpenSearchClient) Search(idxName, searchTerm string) ([]any, error) {
+	res, err := osc.Client.Search(
+		osc.Client.Search.WithIndex(idxName),
+		osc.Client.Search.WithQuery(fmt.Sprintf(`body: "%s"`, searchTerm)),
+	)
+	if err != nil {
+		log.Printf("error occurred: [%s]", err.Error())
+	}
+	buf := make([]byte, 1028)
+	n, err := res.Body.Read(buf)
+
+	var hits map[string]interface{}
+
+	var messages []any
+
+	err = json.Unmarshal(buf[:n], &hits)
+	if err != nil {
+		fmt.Println("Error unmarshaling JSON:", err)
+		return nil, err
+	}
+
+	hitsObject := hits["hits"].(map[string]interface{})
+	hitsArray := hitsObject["hits"].([]interface{})
+
+	for _, hit := range hitsArray {
+		messages = append(messages, hit.(map[string]interface{})["_source"])
+	}
+	return messages, nil
+}
+
 func (osc *OpenSearchClient) GetChatMessages(idxName string) ([]any, error) {
 	res, err := osc.Client.Search(
 		osc.Client.Search.WithIndex(idxName),
