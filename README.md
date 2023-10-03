@@ -39,8 +39,12 @@ curl -X POST http://localhost:8080/api/v1/applications/dh82jm0q/chats/1/messages
 
 - list all messages for chat 1
 
+```bash
 curl -X GET http://localhost:8080/applications/dh82jm0q/chats/1/messages/
+```
 
-- partial search in specific chat messages 
-
+- partial search in specific chat messages
+  
+```bash
 curl -X GET "http://localhost:8080/applications/dh82jm0q/chats/6/messages/search?query=hel"
+```
