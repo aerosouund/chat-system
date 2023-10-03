@@ -63,3 +63,31 @@ func (ms *MessageServer) HandleCreateMessage(routerVars map[string]string, w htt
 		err = ms.Opensearch.PutDocument(chatMessageCountKey, token, requestBody["body"], chatNumberInt, newMessageCount)
 	}
 }
+
+func (ms *MessageServer) HandleSearchMessages(routerVars map[string]string, w http.ResponseWriter, r *http.Request) HttpHandlerFunc {
+	queryTerm, ok := r.URL.Query()["query"]
+	if !ok {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing query term"})
+	}
+
+	token := routerVars["token"]
+	chatNum := routerVars["id"]
+
+	var chatMessageIdx = token + "-" + chatNum
+	messages, err := ms.Opensearch.Search(chatMessageIdx, queryTerm[0])
+
+	return func(http.ResponseWriter, *http.Request) {
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		jsonData, err := json.Marshal(messages)
+		if err != nil {
+			writeJSON(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+
+		writeJSON(w, http.StatusOK, jsonData)
+	}
+}

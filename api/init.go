@@ -68,6 +68,7 @@ func MakeHTTPTransport(as *AppServer, cs *ChatServer, ms *MessageServer, router 
 
 	router.HandleFunc("/applications/{token}/chats/{id}/messages", ms.GetMuxVarsMiddleware(ms.HandleCreateMessage)).Methods("POST")
 	router.HandleFunc("/applications/{token}/chats/{id}/messages", ms.GetMuxVarsMiddleware(ms.HandleGetChatMessages)).Methods("GET")
+	router.HandleFunc("/applications/{token}/chats/{id}/messages/search", ms.GetMuxVarsMiddleware(ms.HandleSearchMessages)).Methods("GET")
 
 	http.Handle("/", router)
 	logrus.Info("Api server initialized")
